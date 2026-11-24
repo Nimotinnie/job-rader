@@ -1,4 +1,4 @@
-"""每日抓取職缺 -> docs/jobs.json。需要環境變數 ADZUNA_ID / ADZUNA_KEY（免費申請 developer.adzuna.com）。"""
+"""每日抓取職缺 -> docs/jobs.json。需要環境變數 REED_KEY（免費申請 reed.co.uk/developers/jobseeker）。"""
 import csv, io, json, os, re, time, datetime as dt
 import requests
 
@@ -63,28 +63,29 @@ def tw_104(keyword):
         time.sleep(1.5)
     return out
 
-def uk_adzuna(what, kind):
-    i, k = os.getenv("ADZUNA_ID"), os.getenv("ADZUNA_KEY")
-    if not (i and k):
-        print("no adzuna key"); return []
+def uk_reed(what, kind):
+    """Reed 官方 Jobseeker API（免費金鑰）。認證方式：金鑰當 Basic Auth 帳號，密碼留空。"""
+    key = os.getenv("REED_KEY")
+    if not key:
+        print("no reed key"); return []
     out = []
-    for page in (1, 2):
-        try:
-            r = requests.get(f"https://api.adzuna.com/v1/api/jobs/gb/search/{page}", timeout=20, params=dict(
-                app_id=i, app_key=k, what=what, where="london", results_per_page=50,
-                sort_by="salary", max_days_old=30, **{"content-type": "application/json"})).json()
-            for j in r.get("results", []):
-                c = j["company"]["display_name"]
-                if not LARGE.search(c): continue
-                hi = int(j.get("salary_max") or 0)
-                d = (j.get("description") or "").lower()
-                out.append(dict(region="uk", kind=kind, title=j["title"], company=c, loc=j["location"]["display_name"],
-                    annual=hi, pay=f"£{int(j.get('salary_min') or 0):,}–£{hi:,}" if hi else "未公布",
-                    url=j["redirect_url"], date=j["created"][:10],
-                    visa="內文提到 sponsorship，請自行確認" if "sponsor" in d else ""))
-        except Exception as e:
-            print("adzuna fail", what, e)
-        time.sleep(1)
+    try:
+        r = requests.get("https://www.reed.co.uk/api/1.0/search", auth=(key, ""), timeout=30, params={
+            "keywords": what, "locationName": "London", "distanceFromLocation": 15,
+            "resultsToTake": 100, "permanent": "true", **({"graduate": "true"} if kind == "grad" else {})}).json()
+        for j in r.get("results", []):
+            c = j.get("employerName", "")
+            if not LARGE.search(c): continue
+            lo, hi = int(j.get("minimumSalary") or 0), int(j.get("maximumSalary") or 0)
+            try:
+                d = dt.datetime.strptime(j.get("date", ""), "%d/%m/%Y").strftime("%Y-%m-%d")
+            except Exception:
+                d = str(j.get("date", ""))
+            out.append(dict(region="uk", kind=kind, title=j["jobTitle"], company=c, loc=j.get("locationName", ""),
+                annual=hi, pay=f"£{lo:,}–£{hi:,}" if hi else "未公布", url=j["jobUrl"], date=d))
+    except Exception as e:
+        print("reed fail", what, e)
+    time.sleep(1)
     return out
 
 CURATED = [  # 有明確截止日的 graduate program，手動維護
@@ -103,7 +104,7 @@ def main():
         jobs += tw_104(kw)
     for what, kind in [("graduate analyst", "grad"), ("graduate data", "grad"), ("associate analytics", "assoc"),
                        ("graduate consultant", "grad"), ("associate consultant", "assoc")]:
-        jobs += uk_adzuna(what, kind)
+        jobs += uk_reed(what, kind)
     for j in jobs:
         if j["region"] == "uk":
             j["sponsor"] = is_sponsor(j["company"], sponsors)

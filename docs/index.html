@@ -1,0 +1,34 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monica 職缺雷達</title>
+<style>
+:root{--navy:#002147;--bg:#f4f6fa;--card:#fff;--ink:#14213d;--mute:#5b6b85;--line:#dbe2ee;--gold:#b8955a}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Noto Sans TC","PingFang TC",system-ui,sans-serif}
+header{background:var(--navy);color:#fff;padding:20px 20px 0}.w{max-width:980px;margin:0 auto}
+h1{margin:0;font:600 24px Georgia,serif}.s{color:#b9c8e3;font-size:13px;margin:6px 0 14px}
+.tab{background:none;border:0;color:#b9c8e3;padding:10px 18px;font:inherit;cursor:pointer;border-bottom:3px solid transparent}
+.tab.on{color:#fff;border-color:var(--gold);font-weight:600}main{padding:20px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:9px}
+.t{display:flex;justify-content:space-between;gap:10px}.t a{color:var(--navy);font-weight:600}
+.p{color:var(--gold);font-weight:600;font-size:14px;text-align:right}.m{color:var(--mute);font-size:13px}
+.f{border:1px solid var(--line);background:var(--card);border-radius:18px;padding:4px 12px;margin:0 6px 10px 0;cursor:pointer;font:inherit;font-size:13px}
+.f.on{background:var(--navy);color:#fff}h2{font:600 16px Georgia,serif;color:var(--navy);margin:18px 0 8px}
+.v{color:#b26a00;font-size:12px}
+</style></head><body>
+<header><div class="w"><h1>Monica 職缺雷達</h1><div class="s" id="u">載入中…</div>
+<button class="tab on" data-r="tw">台北</button><button class="tab" data-r="uk">倫敦</button></div></header>
+<main class="w"><div id="fl"></div><div id="cur"></div><h2>依年薪由高到低（每日自動更新）</h2><div id="ls"></div></main>
+<script>
+let R='tw',F='all',D;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+fetch('jobs.json').then(r=>r.json()).then(d=>{D=d;document.getElementById('u').textContent='最後更新 '+new Date(d.updated).toLocaleString('zh-TW')+'（每日自動）';draw()});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{R=b.dataset.r;F='all';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));draw()});
+function draw(){
+ const opts=R==='uk'?[['all','全部'],['grad','Graduate'],['assoc','Associate'],['pub','有公布薪資'],['spon','有 sponsor 牌照（加分）']]:[['all','全部'],['pub','有公布薪資']];
+ fl.innerHTML=opts.map(([k,l])=>`<button class="f ${F===k?'on':''}" onclick="F='${k}';draw()">${l}</button>`).join('');
+ const today=new Date().toISOString().slice(0,10);
+ cur.innerHTML='<h2>Graduate Program 截止追蹤</h2>'+D.curated.filter(j=>j.region===R).map(j=>{const st=j.dl==='rolling'?'滾動收件':(j.dl<today?'已截止':'截止 '+j.dl);
+  return `<div class="c"><div class="t"><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a><span class="p">${st}</span></div></div>`}).join('');
+ const L=D.jobs.filter(j=>j.region===R&&(F==='all'||(F==='pub'?j.annual>0:F==='spon'?j.sponsor===true:j.kind===F)));
+ ls.innerHTML=L.length?L.map(j=>`<div class="c"><div class="t"><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a><span class="p">${esc(j.pay)}</span></div><div class="m">${esc(j.company)} · ${esc(j.loc)} · ${esc(j.date)}</div>${j.sponsor===true?'<div class="v" style="color:#1a7f4b">✓ 加分：雇主持有 Skilled Worker 牌照（日後轉簽較容易）</div>':j.sponsor===false?'<div class="v">名單中找不到同名公司（可能名稱不同；Graduate 簽證期間不影響申請）</div>':''}${j.visa?`<div class="v">${esc(j.visa)}</div>`:''}</div>`).join(''):'<div class="m">目前沒有符合的職缺。</div>';
+}
+</script></body></html>
